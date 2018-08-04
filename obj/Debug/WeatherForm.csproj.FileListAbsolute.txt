@@ -1,0 +1,10 @@
+c:\users\user\source\repos\WeatherForm\WeatherForm\bin\Debug\WeatherForm.exe.config
+c:\users\user\source\repos\WeatherForm\WeatherForm\bin\Debug\WeatherForm.exe
+c:\users\user\source\repos\WeatherForm\WeatherForm\bin\Debug\WeatherForm.pdb
+c:\users\user\source\repos\WeatherForm\WeatherForm\obj\Debug\WeatherForm.csprojAssemblyReference.cache
+c:\users\user\source\repos\WeatherForm\WeatherForm\obj\Debug\WeatherForm.Properties.Resources.resources
+c:\users\user\source\repos\WeatherForm\WeatherForm\obj\Debug\WeatherForm.csproj.GenerateResource.cache
+c:\users\user\source\repos\WeatherForm\WeatherForm\obj\Debug\WeatherForm.csproj.CoreCompileInputs.cache
+c:\users\user\source\repos\WeatherForm\WeatherForm\obj\Debug\WeatherForm.exe
+c:\users\user\source\repos\WeatherForm\WeatherForm\obj\Debug\WeatherForm.pdb
+C:\Users\User\source\repos\WeatherForm\WeatherForm\obj\Debug\WeatherForm.Form1.resources
