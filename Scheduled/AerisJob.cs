@@ -72,7 +72,7 @@ namespace WeatherServiceForm.Scheduled
                 Log.Error(ex.StackTrace);
             }
 
-            Log.Information("Finished GatherWeatherData()");
+            Log.Information("Finished GatherWeatherData().");
             Log.Information($"Expected Total WeatherData Entries: {expectedTotalWeatherDataEntries}, Actual: {actualTotalWeatherDataEntries}.\n");
 
         }
@@ -98,7 +98,7 @@ namespace WeatherServiceForm.Scheduled
 
                         if (success)
                         {
-                            Log.Information($"Inserted into WeatherData >> StationId: {weatherData.StationId}, Zip Code: {weatherData.ZipCode}, " +
+                            Log.Debug($"Inserted into WeatherData >> StationId: {weatherData.StationId}, Zip Code: {weatherData.ZipCode}, " +
                                 $"RDate: {weatherData.RDate.ToShortDateString()}, LowTmp: {weatherData.LowTmp}, HighTmp: {weatherData.HighTmp}, " +
                                 $"AvgTmp: {weatherData.AvgTmp}, DewPt: {weatherData.DewPt}");
 
@@ -114,14 +114,14 @@ namespace WeatherServiceForm.Scheduled
                     }
                     catch (Exception e)
                     {
-                        Log.Error(e.Message);
-                        Log.Error(e.StackTrace);
+                        Log.Error($"Zip: {zipCode}, TargetDate: {targetDate} >>  {e.Message}");
+                        Log.Debug(e.StackTrace);
                     }
                 }
             };
 
-            Log.Information($"Finished GatherDailyWeatherData(int {i}) for {targetDate.ToShortDateString()}.");
-            Log.Information($"Expected inserts: {expectedDailyWeatherDataInserts}, Actual inserts: {actualDailyWeatherDataInserts}.\n");
+            Log.Information($"Finished GatherDailyWeatherData for {targetDate.ToShortDateString()}. " +
+                $"Expected inserts: {expectedDailyWeatherDataInserts}, Actual inserts: {actualDailyWeatherDataInserts}.\n");
 
             expectedDailyWeatherDataInserts = 0;
             actualDailyWeatherDataInserts = 0;
@@ -181,7 +181,6 @@ namespace WeatherServiceForm.Scheduled
 
                 foreach (ReadingsQueryResult result in readings)
                 {
-                    //Console.WriteLine(result.DateStart + ", " + result.DateEnd + ", " + result.Days + ",  result.B1 = " + result.B1 + ",  result.B2 = " + result.B2 + ", result.B3 = " + result.B3 + ",  result.B4 = " + result.B4);
                     try
                     {
                         List<WeatherData> weatherDataList = _weatherRepository.GetWeatherDataByZipStartAndEndDate(result.Zip, result.DateStart, result.DateEnd);
@@ -205,7 +204,7 @@ namespace WeatherServiceForm.Scheduled
             int expectedTotalWthExpUsageEntries = _weatherRepository.GetExpectedWthExpUsageRowCount(fromDateStartStr);
             int actualTotalWthExpUsageEntries = _weatherRepository.GetActualWthExpUsageRowCount();
 
-            Log.Information($"Finished PopulateWthExpUsage(). Expected inserts: {expectedWthExpUsageInserts}, Actual: {actualWthExpUsageInserts}");
+            Log.Information($"Finished PopulateWthExpUsage(). Expected inserts: {expectedWthExpUsageInserts}, Actual: {actualWthExpUsageInserts}.");
             Log.Information($"Expected WthExpUsage total entries: {expectedTotalWthExpUsageEntries}, Actual: {actualTotalWthExpUsageEntries}.\n");
 
             expectedWthExpUsageInserts = 0;
@@ -222,9 +221,9 @@ namespace WeatherServiceForm.Scheduled
 
             if (success)
             {
-                Log.Information($"Inserted into WthExpUsage >> RdngID: {result.RdngID} WthExpUsage: {resultAsDecimal} ... B1: {result.B1} B2: {result.B2} " +
+                Log.Debug($"Inserted into WthExpUsage >> RdngID: {result.RdngID} WthExpUsage: {resultAsDecimal} ... B1: {result.B1} B2: {result.B2} " +
                     $"B3: {result.B3} Hdd: {heatingCoolingDegreeDays.HDD} B4: {result.B4} B5: {result.B5} Cdd: {heatingCoolingDegreeDays.CDD} " +
-                    $"RdngUnitID: {result.RUnitID} WthNormalParamsUnitID: {result.WnpUnitID}");
+                    $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}");
 
                 actualWthExpUsageInserts++;
             }
@@ -232,7 +231,7 @@ namespace WeatherServiceForm.Scheduled
             {
                 Log.Error($"FAILED attempt: insert into WthExpUsage >> RdngID: {result.RdngID} WthExpUsage: {resultAsDecimal} ... B1: {result.B1} B2: " +
                     $"{result.B2} B3: {result.B3} Hdd: {heatingCoolingDegreeDays.HDD} B4: {result.B4} B5: {result.B5} Cdd: {heatingCoolingDegreeDays.CDD} " +
-                    $"RdngUnitID: {result.RUnitID} WthNormalParamsUnitID: {result.WnpUnitID}");
+                    $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}");
             }
         }
 
@@ -249,12 +248,15 @@ namespace WeatherServiceForm.Scheduled
 
             foreach (WeatherData weatherData in weatherDataList)
             {
-
-                if (result.B5 > 0)
+                if (!weatherData.AvgTmp.HasValue)
+                {
+                    throw new Exception($"WeatherData.AvgTmp is null for {weatherData.ZipCode} on {weatherData.RDate}");
+                }
+                else if (result.B5 > 0)
                 {
                     if (weatherData.AvgTmp >= result.B5)
                     {
-                        hcdd.CDD = hcdd.CDD + (weatherData.AvgTmp - result.B5);
+                        hcdd.CDD = hcdd.CDD + (weatherData.AvgTmp.Value - result.B5);
                     }
 
                 }
@@ -262,7 +264,7 @@ namespace WeatherServiceForm.Scheduled
                 {
                     if (weatherData.AvgTmp <= result.B3)
                     {
-                        hcdd.HDD = hcdd.HDD + (result.B3 - weatherData.AvgTmp);
+                        hcdd.HDD = hcdd.HDD + (result.B3 - weatherData.AvgTmp.Value);
                     }
                 }
             }
@@ -308,7 +310,7 @@ namespace WeatherServiceForm.Scheduled
         private AerisResult GetAerisResult(string zipCode, DateTime targetDate)
         {
             string fromDate = targetDate.Date.ToString("MM/dd/yyyy");
-            Log.Information($"Calling Aeris for zip: {zipCode} and date: {fromDate}");
+            Log.Debug($"Calling Aeris for zip: {zipCode} and date: {fromDate}");
 
             /* 
              * example

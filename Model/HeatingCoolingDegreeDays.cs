@@ -8,7 +8,7 @@ namespace WeatherServiceForm.Model
 {
     class HeatingCoolingDegreeDays
     {
-        public double? HDD { get; set; }
-        public double? CDD { get; set; }
+        public double HDD { get; set; }
+        public double CDD { get; set; }
     }
 }
