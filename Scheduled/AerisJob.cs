@@ -183,15 +183,38 @@ namespace WeatherServiceForm.Scheduled
                 {
                     try
                     {
+                        if (!result.R2.HasValue || result.R2.Value > 1)
+                        {
+                            continue;
+                        }
+
+                        if (result.R2.Value >= 0.80)
+                        {
+                            _weatherRepository.InsertWthExpUsage(result.RdngID, result.Units.Value);
+                        }
+
+                        if (result.DateStart == DateTime.MinValue || result.DateEnd == DateTime.MinValue)
+                        {
+                            throw new Exception("DateStart and/or DateEnd is null.");
+                        }
+                        int daysInReading = result.DateEnd.Subtract(result.DateStart).Days;
+
                         List<WeatherData> weatherDataList = _weatherRepository.GetWeatherDataByZipStartAndEndDate(result.Zip, result.DateStart, result.DateEnd);
+
+                        if (weatherDataList.Count != daysInReading)
+                        {
+                            throw new Exception($"WeatherDataList.Count != daysInReading; WeatherDataList.Count = {weatherDataList.Count}, " +
+                                $"daysInReading = {daysInReading}.");
+                        }
+
                         HeatingCoolingDegreeDays heatingCoolingDegreeDays = HeatingCoolingDegreeDaysValueOf(result, weatherDataList);
 
                         DoCalculation(result, heatingCoolingDegreeDays);
                     }
                     catch (Exception e)
                     {
-                        Log.Error(e.Message);
-                        Log.Error(e.StackTrace);
+                        Log.Error($"{e.Message} + RdngID: {result.RdngID} AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}");
+                        Log.Debug(e.StackTrace);
                     }
                 }
             }
@@ -211,30 +234,6 @@ namespace WeatherServiceForm.Scheduled
             actualWthExpUsageInserts = 0;
         }
 
-        private void DoCalculation(ReadingsQueryResult result, HeatingCoolingDegreeDays heatingCoolingDegreeDays)
-        {
-            // Normalized Energy Usage = E = B1(DAYS) + B2(HDDB3) + B4(CDDB5)
-            double? resultAsDouble = (result.B1 * result.Days) + (result.B2 * heatingCoolingDegreeDays.HDD) + (result.B4 * heatingCoolingDegreeDays.CDD);
-            decimal resultAsDecimal = decimal.Round(Convert.ToDecimal(resultAsDouble), 4, MidpointRounding.AwayFromZero);
-
-            bool success = _weatherRepository.InsertWthExpUsage(result.RdngID, resultAsDecimal);
-
-            if (success)
-            {
-                Log.Debug($"Inserted into WthExpUsage >> RdngID: {result.RdngID} WthExpUsage: {resultAsDecimal} ... B1: {result.B1} B2: {result.B2} " +
-                    $"B3: {result.B3} Hdd: {heatingCoolingDegreeDays.HDD} B4: {result.B4} B5: {result.B5} Cdd: {heatingCoolingDegreeDays.CDD} " +
-                    $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}");
-
-                actualWthExpUsageInserts++;
-            }
-            else
-            {
-                Log.Error($"FAILED attempt: insert into WthExpUsage >> RdngID: {result.RdngID} WthExpUsage: {resultAsDecimal} ... B1: {result.B1} B2: " +
-                    $"{result.B2} B3: {result.B3} Hdd: {heatingCoolingDegreeDays.HDD} B4: {result.B4} B5: {result.B5} Cdd: {heatingCoolingDegreeDays.CDD} " +
-                    $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}");
-            }
-        }
-
         private HeatingCoolingDegreeDays HeatingCoolingDegreeDaysValueOf(ReadingsQueryResult result, List<WeatherData> weatherDataList)
         {
             HeatingCoolingDegreeDays hcdd = new HeatingCoolingDegreeDays();
@@ -244,6 +243,12 @@ namespace WeatherServiceForm.Scheduled
             if (result.B3 == 0 && result.B5 == 0)
             {
                 return hcdd;
+            }
+
+            if (weatherDataList.Count != result.Days)
+            {
+                throw new Exception($"WeatherDataList.Count != reading.Days; WeatherDataList.Count = {weatherDataList.Count}, " +
+                    $"reading.Days = {result.Days}.");
             }
 
             foreach (WeatherData weatherData in weatherDataList)
@@ -270,6 +275,30 @@ namespace WeatherServiceForm.Scheduled
             }
 
             return hcdd;
+        }
+
+        private void DoCalculation(ReadingsQueryResult result, HeatingCoolingDegreeDays heatingCoolingDegreeDays)
+        {
+            // Normalized Energy Usage = E = B1(DAYS) + B2(HDDB3) + B4(CDDB5)
+            double? resultAsDouble = (result.B1 * result.Days) + (result.B2 * heatingCoolingDegreeDays.HDD) + (result.B4 * heatingCoolingDegreeDays.CDD);
+            decimal resultAsDecimal = decimal.Round(Convert.ToDecimal(resultAsDouble), 4, MidpointRounding.AwayFromZero);
+
+            bool success = _weatherRepository.InsertWthExpUsage(result.RdngID, resultAsDecimal);
+
+            if (success)
+            {
+                Log.Debug($"Inserted into WthExpUsage >> RdngID: {result.RdngID} WthExpUsage: {resultAsDecimal} ... B1: {result.B1} B2: {result.B2} " +
+                    $"B3: {result.B3} Hdd: {heatingCoolingDegreeDays.HDD} B4: {result.B4} B5: {result.B5} Cdd: {heatingCoolingDegreeDays.CDD} " +
+                    $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}");
+
+                actualWthExpUsageInserts++;
+            }
+            else
+            {
+                Log.Error($"FAILED attempt: insert into WthExpUsage >> RdngID: {result.RdngID} WthExpUsage: {resultAsDecimal} ... B1: {result.B1} B2: " +
+                    $"{result.B2} B3: {result.B3} Hdd: {heatingCoolingDegreeDays.HDD} B4: {result.B4} B5: {result.B5} Cdd: {heatingCoolingDegreeDays.CDD} " +
+                    $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}");
+            }
         }
 
         private IWeatherRepository _weatherRepositoryValueOf(AerisJobParams aerisJobParams)

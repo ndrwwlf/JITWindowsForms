@@ -21,7 +21,7 @@ namespace WeatherForm
         static void Main()
         {
             string userDir = "C:\\Users\\workweek";
-            //string userDir = "C:\\Users\\User";
+            //string userDir = "C:\\Users\\andy";
 
             Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()

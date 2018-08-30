@@ -117,6 +117,27 @@ namespace JitTopshelf.Scheduled
 
                     AccordResult accord = CalculateLinearRegression(allBalancePointStatsFromYear, normalParams);
 
+                    if (accord.R2Accord < 0.8)
+                    {
+                        bool success = UpdateOrInsertWthNormalParams(normalParams);
+                        if (success && normalParamsExists)
+                        {
+                            newNormalParamsList.Add(normalParams);
+                            updateCount++;
+                        }
+                        else if (success && !normalParamsExists)
+                        {
+                            newNormalParamsList.Add(normalParams);
+                            insertCount++;
+                        }
+                        else
+                        {
+                            failCount++;
+                        }
+
+                        continue;
+                    }
+
                     if (accord.FTestFailed)
                     {
                         Log.Warning($"Best Regression Model's F-Test failed... " +
@@ -177,10 +198,10 @@ namespace JitTopshelf.Scheduled
                         }
                     }
                 }
-                catch (BadWNRdngDataException bdex)
+                catch (BadWNRdngDataException bdEx)
                 {
                     failCount++;
-                    Log.Warning(bdex.Message);
+                    Log.Warning(bdEx.Message);
                 }
                 catch (Exception e)
                 {
@@ -369,6 +390,11 @@ namespace JitTopshelf.Scheduled
                             };
                     }
 
+                    if (!(fullYData.Sum() > 0))
+                    {
+                        return new AccordResult();
+                    }
+
                     double[] avgHddsForEachReadingInYear = new double[readingsCount];
                     double[] avgCddsForEachReadingInYear = new double[readingsCount];
 
@@ -399,16 +425,17 @@ namespace JitTopshelf.Scheduled
                             UseIntercept = false
                         };
 
-                        double r2 = MathNet.Numerics.GoodnessOfFit.CoefficientOfDetermination(
-                            onesVector.Select(x => x * modelParams[0]), fullYDataDailyAvg);
+                        //double r2 = MathNet.Numerics.GoodnessOfFit.CoefficientOfDetermination(
+                        //    onesVector.Select(x => x * modelParams[0]), fullYDataDailyAvg);
 
                         AccordResult accordResult = new AccordResult()
                         {
-                            IsSimpleSingleRegression = true,
-                            HeatingBP = _pointPair.HeatingBalancePoint,
-                            CoolingBP = _pointPair.CoolingBalancePoint,
-                            Intercept = modelParams[0],
-                            R2Accord = r2,
+                            //IsSimpleSingleRegression = true,
+                            //HeatingBP = _pointPair.HeatingBalancePoint,
+                            //CoolingBP = _pointPair.CoolingBalancePoint,
+                            //Intercept = modelParams[0],
+                            //R2Accord = r2,
+                            R2Accord = 0
                         };
 
                         accordResults.Add(accordResult);
@@ -443,7 +470,10 @@ namespace JitTopshelf.Scheduled
 
                             };
 
-                            if (mlra.Coefficients.All(x => x.TTest.Significant))
+                            if (mlra.Coefficients.All(x => x.TTest.Significant) &&
+                                mlra.Coefficients.All(x => x.Value >= 0) &&
+                                mlra.Regression.Intercept > 0 &&
+                                r2Accord >= 0.80)
                             {
                                 accordResults.Add(accordResult);
                             }
@@ -492,7 +522,7 @@ namespace JitTopshelf.Scheduled
                             R2Accord = r2Accord
                         };
 
-                        if (tTest.Significant)
+                        if (tTest.Significant && accordResult.B2 > 0 && r2Accord >= 0.80)
                         {
                             accordResults.Add(accordResult);
                         }
@@ -507,7 +537,7 @@ namespace JitTopshelf.Scheduled
                         SimpleLinearRegression regressionAccord = ols.Learn(avgCddsForEachReadingInYear, fullYDataDailyAvg);
 
                         double[] predictedAccord = regressionAccord.Transform(avgCddsForEachReadingInYear);
-                        double rAccord = new RSquaredLoss(1, fullYDataDailyAvg).Loss(predictedAccord);
+                        double r2Accord = new RSquaredLoss(1, fullYDataDailyAvg).Loss(predictedAccord);
 
                         int degreesOfFreedom = normalParamsKey.MoCt - 2;
                         double ssx = Math.Sqrt(avgCddsForEachReadingInYear.Subtract(avgCddsForEachReadingInYear.Mean()).Pow(2).Sum());
@@ -529,10 +559,10 @@ namespace JitTopshelf.Scheduled
                             CoolingBP = _pointPair.CoolingBalancePoint,
                             Intercept = regressionAccord.Intercept,
                             B4 = regressionAccord.Slope,
-                            R2Accord = rAccord
+                            R2Accord = r2Accord
                         };
 
-                        if (tTest.Significant)
+                        if (tTest.Significant && accordResult.B4 > 0 && r2Accord >= 0.80)
                         {
                             accordResults.Add(accordResult);
                         }
@@ -615,12 +645,14 @@ namespace JitTopshelf.Scheduled
                                 throw new Exception($"DateStart and/or DateEnd is null.");
                             }
 
+                            int daysInReading = result.DateEnd.Subtract(result.DateStart).Days;
+
                             List<WeatherData> weatherDataList = _weatherRepository.GetWeatherDataByZipStartAndEndDate(result.Zip, result.DateStart, result.DateEnd);
 
-                            if (weatherDataList.Count != result.Days)
+                            if (weatherDataList.Count != daysInReading)
                             {
-                                throw new Exception($"WeatherDataList.Count != reading.Days; WeatherDataList.Count = {weatherDataList.Count}, " +
-                                $"reading.Days = {result.Days}.");
+                                throw new Exception($"WeatherDataList.Count != daysInReading; WeatherDataList.Count = {weatherDataList.Count}, " +
+                                    $"daysInReading = {daysInReading}.");
                             }
 
                             BalancePointPair balancePointPair = new BalancePointPair()
