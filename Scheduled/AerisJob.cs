@@ -188,7 +188,7 @@ namespace WeatherServiceForm.Scheduled
                             continue;
                         }
 
-                        if (result.R2.Value >= 0.80)
+                        if (result.R2.Value >= 0.75)
                         {
                             _weatherRepository.InsertWthExpUsage(result.RdngID, result.Units.Value);
                         }

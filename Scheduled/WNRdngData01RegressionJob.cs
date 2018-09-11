@@ -25,7 +25,7 @@ namespace JitTopshelf.Scheduled
         private AerisJobParams _aerisJobParams;
         private IWeatherRepository _weatherRepository;
 
-        private DateTime _fromDateStart = new DateTime(2015, 01, 15);
+        private DateTime _fromDateStart = new DateTime(2015, 01, 01);
 
         public void Execute(AerisJobParams aerisJobParams)
         {
@@ -404,26 +404,26 @@ namespace JitTopshelf.Scheduled
                         avgCddsForEachReadingInYear[i] = hcddMatrix[i][1];
                     }
 
-                    double[] modelParams = new double[3];
-                    modelParams[0] = 0;
-                    modelParams[1] = 0;
-                    modelParams[2] = 0;
+                    //double[] modelParams = new double[3];
+                    //modelParams[0] = 0;
+                    //modelParams[1] = 0;
+                    //modelParams[2] = 0;
 
                     if (_pointPair.HeatingBalancePoint == 0 && _pointPair.CoolingBalancePoint == 0)
                     {
-                        double[] onesVector = new double[readingsCount];
+                        //double[] onesVector = new double[readingsCount];
 
-                        for (int i = 0; i < readingsCount; i++)
-                        {
-                            onesVector[i] = 1;
-                        }
+                        //for (int i = 0; i < readingsCount; i++)
+                        //{
+                        //    onesVector[i] = 1;
+                        //}
 
-                        modelParams[0] = Fit.LineThroughOrigin(onesVector, fullYDataDailyAvg);
+                        //modelParams[0] = Fit.LineThroughOrigin(onesVector, fullYDataDailyAvg);
 
-                        OrdinaryLeastSquares ols = new OrdinaryLeastSquares()
-                        {
-                            UseIntercept = false
-                        };
+                        //OrdinaryLeastSquares ols = new OrdinaryLeastSquares()
+                        //{
+                        //    UseIntercept = false
+                        //};
 
                         //double r2 = MathNet.Numerics.GoodnessOfFit.CoefficientOfDetermination(
                         //    onesVector.Select(x => x * modelParams[0]), fullYDataDailyAvg);
