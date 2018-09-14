@@ -10,7 +10,7 @@ using System.Windows.Forms;
 using WeatherServiceForm;
 using WeatherServiceForm.Scheduled;
 
-namespace WeatherForm
+namespace WeatherServiceForm
 {
     static class Program
     {
@@ -30,8 +30,9 @@ namespace WeatherForm
             .MinimumLevel.Override("Quartz", LogEventLevel.Error)
             .Enrich.FromLogContext()
             //to outsite of project
-            .WriteTo.File(userDir + "/Logs/MasterLog.txt", restrictedToMinimumLevel: LogEventLevel.Information, rollOnFileSizeLimit: true)
-            .WriteTo.RollingFile(userDir + "/Logs/Daily/log-{Date}.txt", retainedFileCountLimit: null)
+            .WriteTo.File(userDir + "/Logs/MasterLog.log", restrictedToMinimumLevel: LogEventLevel.Information, fileSizeLimitBytes: 512000,
+                            rollOnFileSizeLimit: true, retainedFileCountLimit: 2, shared: true)
+            .WriteTo.RollingFile(userDir + "/Logs/Daily/log-{Date}.log", retainedFileCountLimit: 60, shared: true)
             .WriteTo.Console()
             .CreateLogger();
 

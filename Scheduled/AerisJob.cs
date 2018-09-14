@@ -1,17 +1,15 @@
-﻿using Serilog;
+﻿using WeatherServiceForm.Dao;
+using WeatherServiceForm.Model;
+using WeatherServiceForm.Repository;
+using Newtonsoft.Json;
+using Quartz;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using Quartz;
-using WeatherForm.Dto;
-using WeatherForm.Model;
-using WeatherForm.Repository;
-using WeatherServiceForm.Model;
-using System.Threading.Tasks;
-using WeatherServiceForm.Dto;
 using System.Net;
-using Newtonsoft.Json;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace WeatherServiceForm.Scheduled
 {
@@ -20,51 +18,49 @@ namespace WeatherServiceForm.Scheduled
         private AerisJobParams _aerisJobParams;
         private IWeatherRepository _weatherRepository;
 
-        private int expectedWthExpUsageInserts;
-        private int actualWthExpUsageInserts;
+        private int _expectedWthExpUsageInserts;
+        private int _actualWthExpUsageInserts;
 
-        private int expectedDailyWeatherDataInserts;
-        private int actualDailyWeatherDataInserts;
+        private int _expectedDailyWeatherDataInserts;
+        private int _actualDailyWeatherDataInserts;
 
-        private int expectedTotalWeatherDataEntries;
-        private int actualTotalWeatherDataEntries;
+        private int _expectedTotalWeatherDataEntries;
+        private int _actualTotalWeatherDataEntries;
 
-        private int expectedHistoricalWeatherDataInserts;
-        private int actualHistoricalWeatherDataInserts;
+        private int _expectedHistoricalWeatherDataInserts;
+        private int _actualHistoricalWeatherDataInserts;
 
-        private DateTime _fromDateStart = new DateTime(2015, 1, 1);
+        private DateTime _fromDateStart = new DateTime(2015, 01, 01);
 
-        public void Execute(AerisJobParams aerisJobParams, DateTime fromDateStart, bool forceHistorical)
+        private readonly int _MoID = 301;
+
+        public void Execute(AerisJobParams aerisJobParams)
         {
             _aerisJobParams = aerisJobParams;
             _weatherRepository = _weatherRepositoryValueOf(_aerisJobParams);
-            _fromDateStart = fromDateStart;
 
-            Log.Information("\nWeather job (Manual Start) starting...\n");
+            Log.Information("\nWeather job starting (Manual Start)...\n");
 
-            GatherWeatherData(forceHistorical);
+            _fromDateStart = _weatherRepository.GetEarliestDateNeededForWeatherDataFetching(_MoID);
+
+            GatherWeatherData();
 
             PopulateWthExpUsageTable();
 
-            Log.Information($"WeatherData was gathered and WthExpUsage calculated for Readings going back to {_fromDateStart.ToShortDateString()}");
-            Log.Information("\nWeather job (Manual Start) finished.\n");
-
+            Log.Information($"WeatherData was gathered and WthExpUsage calculated for Readings going back to MoID: {_MoID}");
+            Log.Information("\nWeather job finished (Manual Start).\n");
         }
 
-        private void GatherWeatherData(bool forceHistorical)
+        private void GatherWeatherData()
         {
             Log.Information("Starting GatherWeatherData()...");
 
             try
             {
-                GatherHistoricalWeatherData(forceHistorical);
+                GatherHistoricalWeatherData();
+                GatherDailyWeatherData(-1);
 
-                if (!forceHistorical)
-                {
-                    GatherDailyWeatherData(-1);
-                }
-
-                actualTotalWeatherDataEntries = _weatherRepository.GetWeatherDataRowCount();
+                _actualTotalWeatherDataEntries = _weatherRepository.GetWeatherDataRowCount();
             }
             catch (Exception ex)
             {
@@ -73,8 +69,10 @@ namespace WeatherServiceForm.Scheduled
             }
 
             Log.Information("Finished GatherWeatherData().");
-            Log.Information($"Expected Total WeatherData Entries: {expectedTotalWeatherDataEntries}, Actual: {actualTotalWeatherDataEntries}.\n");
+            Log.Information($"Expected Total WeatherData Entries: {_expectedTotalWeatherDataEntries}, Actual: {_actualTotalWeatherDataEntries}.\n");
 
+            _expectedTotalWeatherDataEntries = 0;
+            _actualTotalWeatherDataEntries = 0;
         }
 
         private void GatherDailyWeatherData(int i)
@@ -82,13 +80,13 @@ namespace WeatherServiceForm.Scheduled
             DateTime targetDate = DateTime.Now.AddDays(i);
             List<string> zipCodes = _weatherRepository.GetDistinctZipCodes();
 
-            Log.Information($"Starting GatherDailyWeatherData(int {i}) for targetDate: {targetDate} and {zipCodes.Count} zip codes...");
+            Log.Information($"Starting GatherDailyWeatherData(int {i}) for targetDate: {targetDate} and {zipCodes.Count} ZipCodes...");
 
             foreach (string zipCode in zipCodes)
             {
-                if (!_weatherRepository.GetWeatherDataExistForZipAndDate(zipCode, targetDate.Date))
+                if (!_weatherRepository.GetWeatherDataExistForZipAndDate(zipCode, targetDate))
                 {
-                    expectedDailyWeatherDataInserts++;
+                    _expectedDailyWeatherDataInserts++;
 
                     try
                     {
@@ -102,8 +100,8 @@ namespace WeatherServiceForm.Scheduled
                                 $"RDate: {weatherData.RDate.ToShortDateString()}, LowTmp: {weatherData.LowTmp}, HighTmp: {weatherData.HighTmp}, " +
                                 $"AvgTmp: {weatherData.AvgTmp}, DewPt: {weatherData.DewPt}");
 
-                            actualDailyWeatherDataInserts++;
-                            actualHistoricalWeatherDataInserts++;
+                            _actualDailyWeatherDataInserts++;
+                            _actualHistoricalWeatherDataInserts++;
                         }
                         else
                         {
@@ -121,13 +119,13 @@ namespace WeatherServiceForm.Scheduled
             };
 
             Log.Information($"Finished GatherDailyWeatherData for {targetDate.ToShortDateString()}. " +
-                $"Expected inserts: {expectedDailyWeatherDataInserts}, Actual inserts: {actualDailyWeatherDataInserts}.\n");
+                $"Expected inserts: {_expectedDailyWeatherDataInserts}, Actual inserts: {_actualDailyWeatherDataInserts}.\n");
 
-            expectedDailyWeatherDataInserts = 0;
-            actualDailyWeatherDataInserts = 0;
+            _expectedDailyWeatherDataInserts = 0;
+            _actualDailyWeatherDataInserts = 0;
         }
 
-        private void GatherHistoricalWeatherData(bool forceHistorical)
+        private void GatherHistoricalWeatherData()
         {
             DateTime today = DateTime.Now;
 
@@ -138,18 +136,11 @@ namespace WeatherServiceForm.Scheduled
 
             int zipCount = _weatherRepository.GetDistinctZipCodes().Count;
 
-            expectedTotalWeatherDataEntries = ((days * -1) - 1) * zipCount;
-            actualTotalWeatherDataEntries = _weatherRepository.GetWeatherDataRowCount();
+            _expectedTotalWeatherDataEntries = ((days * -1) - 1) * zipCount;
+            _actualTotalWeatherDataEntries = _weatherRepository.GetWeatherDataRowCount();
 
-            if (expectedTotalWeatherDataEntries > actualTotalWeatherDataEntries || forceHistorical)
+            if (_expectedTotalWeatherDataEntries > _actualTotalWeatherDataEntries)
             {
-                expectedHistoricalWeatherDataInserts = expectedTotalWeatherDataEntries - actualTotalWeatherDataEntries;
-
-                if (expectedHistoricalWeatherDataInserts < 0)
-                {
-                    expectedHistoricalWeatherDataInserts = 0;
-                }
-
                 Log.Information($"Starting GatherHistoricalWeatherData(), from {_fromDateStart} to yesterday. {days} days.");
 
                 for (int i = days; i <= -1; i++)
@@ -157,14 +148,16 @@ namespace WeatherServiceForm.Scheduled
                     GatherDailyWeatherData(i);
                 };
 
-                Log.Information($"Finished GatherHistoricalWeatherData().");
-                Log.Information($"Expected inserts: {expectedHistoricalWeatherDataInserts}, Actual inserts: {actualHistoricalWeatherDataInserts}.\n");
+                _expectedHistoricalWeatherDataInserts = _expectedTotalWeatherDataEntries - _actualTotalWeatherDataEntries + zipCount;
 
-                expectedHistoricalWeatherDataInserts = 0;
-                actualHistoricalWeatherDataInserts = 0;
+                Log.Information($"Finished GatherHistoricalWeatherData(). " +
+                    $"Expected inserts: {_expectedHistoricalWeatherDataInserts}, Actual inserts: {_actualHistoricalWeatherDataInserts}.\n");
+
+                _expectedHistoricalWeatherDataInserts = 0;
+                _actualHistoricalWeatherDataInserts = 0;
             }
 
-            expectedTotalWeatherDataEntries += zipCount;
+            _expectedTotalWeatherDataEntries += zipCount;
         }
 
         private void PopulateWthExpUsageTable()
@@ -175,28 +168,45 @@ namespace WeatherServiceForm.Scheduled
 
             try
             {
-                List<ReadingsQueryResult> readings = _weatherRepository.GetReadings(fromDateStartStr);
+                List<ReadingsQueryResult> readings = _weatherRepository.GetReadings(_MoID);
 
-                expectedWthExpUsageInserts = readings.Count;
+                _expectedWthExpUsageInserts = readings.Count;
 
                 foreach (ReadingsQueryResult result in readings)
                 {
                     try
                     {
-                        if (!result.R2.HasValue || result.R2.Value > 1)
+                        if (!result.R2.HasValue
+                            //|| result.R2.Value > 1 
+                            //|| result.R2 < 0
+                            )
                         {
                             continue;
                         }
 
-                        if (result.R2.Value >= 0.75)
+                        if (result.R2.Value < 0.7500)
                         {
-                            _weatherRepository.InsertWthExpUsage(result.RdngID, result.Units.Value);
+                            bool successAndNoModel = _weatherRepository.InsertWthExpUsage(result.RdngID, result.Units.Value);
+                            _actualWthExpUsageInserts++;
+                            if (successAndNoModel)
+                            {
+                                Log.Debug($"Inserted into WthExpUsage (No Weather Model) >> RdngID: {result.RdngID} ExpUsage: {result.Units.Value} << " +
+                                            $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}, Actual Units: {result.Units}.");
+                            }
+                            else
+                            {
+                                Log.Error($"Failed attempt: Insert into WthExpUsage (No Weather Model) " +
+                                            $">> RdngID: {result.RdngID} ExpUsage: {result.Units.Value} << " +
+                                            $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}, Actual Units: {result.Units}");
+                            }
+                            continue;
                         }
 
                         if (result.DateStart == DateTime.MinValue || result.DateEnd == DateTime.MinValue)
                         {
                             throw new Exception("DateStart and/or DateEnd is null.");
                         }
+
                         int daysInReading = result.DateEnd.Subtract(result.DateStart).Days;
 
                         List<WeatherData> weatherDataList = _weatherRepository.GetWeatherDataByZipStartAndEndDate(result.Zip, result.DateStart, result.DateEnd);
@@ -204,7 +214,7 @@ namespace WeatherServiceForm.Scheduled
                         if (weatherDataList.Count != daysInReading)
                         {
                             throw new Exception($"WeatherDataList.Count != daysInReading; WeatherDataList.Count = {weatherDataList.Count}, " +
-                                $"daysInReading = {daysInReading}.");
+                                $"daysInReading = {daysInReading}. Reading.EndDate = {result.DateEnd}");
                         }
 
                         HeatingCoolingDegreeDays heatingCoolingDegreeDays = HeatingCoolingDegreeDaysValueOf(result, weatherDataList);
@@ -213,25 +223,49 @@ namespace WeatherServiceForm.Scheduled
                     }
                     catch (Exception e)
                     {
-                        Log.Error($"{e.Message} + RdngID: {result.RdngID} AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}");
+                        Log.Error($"Cannot calculate ExpUsage for RdngID: {result.RdngID} >> {e.Message}");
                         Log.Debug(e.StackTrace);
                     }
                 }
+
+                int expectedTotalWthExpUsageEntries = _weatherRepository.GetExpectedWthExpUsageRowCount(fromDateStartStr);
+                int actualTotalWthExpUsageEntries = _weatherRepository.GetActualWthExpUsageRowCount();
+
+                Log.Information($"Finished PopulateWthExpUsage(). Expected inserts: {_expectedWthExpUsageInserts}, Actual: {_actualWthExpUsageInserts}");
+                Log.Information($"Expected WthExpUsage total entries: {expectedTotalWthExpUsageEntries}, Actual: {actualTotalWthExpUsageEntries}.\n");
+
             }
             catch (Exception ex)
             {
-                Log.Error(ex.Message);
-                Log.Error(ex.StackTrace);
+                Log.Error(ex.Message + " " + ex.StackTrace);
             }
 
-            int expectedTotalWthExpUsageEntries = _weatherRepository.GetExpectedWthExpUsageRowCount(fromDateStartStr);
-            int actualTotalWthExpUsageEntries = _weatherRepository.GetActualWthExpUsageRowCount();
+            _expectedWthExpUsageInserts = 0;
+            _actualWthExpUsageInserts = 0;
+        }
 
-            Log.Information($"Finished PopulateWthExpUsage(). Expected inserts: {expectedWthExpUsageInserts}, Actual: {actualWthExpUsageInserts}.");
-            Log.Information($"Expected WthExpUsage total entries: {expectedTotalWthExpUsageEntries}, Actual: {actualTotalWthExpUsageEntries}.\n");
+        private void DoCalculation(ReadingsQueryResult result, HeatingCoolingDegreeDays heatingCoolingDegreeDays)
+        {
+            // Normalized Energy Usage = E = B1(DAYS) + B2(HDDB3) + B4(CDDB5)
+            double? resultAsDouble = (result.B1 * result.Days) + (result.B2 * heatingCoolingDegreeDays.HDD) + (result.B4 * heatingCoolingDegreeDays.CDD);
+            decimal resultAsDecimal = decimal.Round(Convert.ToDecimal(resultAsDouble), 4, MidpointRounding.AwayFromZero);
 
-            expectedWthExpUsageInserts = 0;
-            actualWthExpUsageInserts = 0;
+            bool success = _weatherRepository.InsertWthExpUsage(result.RdngID, resultAsDecimal);
+
+            if (success)
+            {
+                Log.Debug($"Inserted into WthExpUsage >> RdngID: {result.RdngID} WthExpUsage: {resultAsDecimal} ... B1: {result.B1} B2: {result.B2} " +
+                    $"B3: {result.B3} Hdd: {heatingCoolingDegreeDays.HDD} B4: {result.B4} B5: {result.B5} Cdd: {heatingCoolingDegreeDays.CDD} " +
+                    $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}, R2: {result.R2}.");
+
+                _actualWthExpUsageInserts++;
+            }
+            else
+            {
+                Log.Error($"FAILED attempt: insert into WthExpUsage >> RdngID: {result.RdngID} WthExpUsage: {resultAsDecimal} ... B1: {result.B1} B2: " +
+                    $"{result.B2} B3: {result.B3} Hdd: {heatingCoolingDegreeDays.HDD} B4: {result.B4} B5: {result.B5} Cdd: {heatingCoolingDegreeDays.CDD} " +
+                    $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}, R2: {result.R2}");
+            }
         }
 
         private HeatingCoolingDegreeDays HeatingCoolingDegreeDaysValueOf(ReadingsQueryResult result, List<WeatherData> weatherDataList)
@@ -243,12 +277,6 @@ namespace WeatherServiceForm.Scheduled
             if (result.B3 == 0 && result.B5 == 0)
             {
                 return hcdd;
-            }
-
-            if (weatherDataList.Count != result.Days)
-            {
-                throw new Exception($"WeatherDataList.Count != reading.Days; WeatherDataList.Count = {weatherDataList.Count}, " +
-                    $"reading.Days = {result.Days}.");
             }
 
             foreach (WeatherData weatherData in weatherDataList)
@@ -275,30 +303,6 @@ namespace WeatherServiceForm.Scheduled
             }
 
             return hcdd;
-        }
-
-        private void DoCalculation(ReadingsQueryResult result, HeatingCoolingDegreeDays heatingCoolingDegreeDays)
-        {
-            // Normalized Energy Usage = E = B1(DAYS) + B2(HDDB3) + B4(CDDB5)
-            double? resultAsDouble = (result.B1 * result.Days) + (result.B2 * heatingCoolingDegreeDays.HDD) + (result.B4 * heatingCoolingDegreeDays.CDD);
-            decimal resultAsDecimal = decimal.Round(Convert.ToDecimal(resultAsDouble), 4, MidpointRounding.AwayFromZero);
-
-            bool success = _weatherRepository.InsertWthExpUsage(result.RdngID, resultAsDecimal);
-
-            if (success)
-            {
-                Log.Debug($"Inserted into WthExpUsage >> RdngID: {result.RdngID} WthExpUsage: {resultAsDecimal} ... B1: {result.B1} B2: {result.B2} " +
-                    $"B3: {result.B3} Hdd: {heatingCoolingDegreeDays.HDD} B4: {result.B4} B5: {result.B5} Cdd: {heatingCoolingDegreeDays.CDD} " +
-                    $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}");
-
-                actualWthExpUsageInserts++;
-            }
-            else
-            {
-                Log.Error($"FAILED attempt: insert into WthExpUsage >> RdngID: {result.RdngID} WthExpUsage: {resultAsDecimal} ... B1: {result.B1} B2: " +
-                    $"{result.B2} B3: {result.B3} Hdd: {heatingCoolingDegreeDays.HDD} B4: {result.B4} B5: {result.B5} Cdd: {heatingCoolingDegreeDays.CDD} " +
-                    $"AccID/UtilID/UnitID: {result.AccID}/{result.UtilID}/{result.UnitID}");
-            }
         }
 
         private IWeatherRepository _weatherRepositoryValueOf(AerisJobParams aerisJobParams)
@@ -339,10 +343,10 @@ namespace WeatherServiceForm.Scheduled
         private AerisResult GetAerisResult(string zipCode, DateTime targetDate)
         {
             string fromDate = targetDate.Date.ToString("MM/dd/yyyy");
-            Log.Debug($"Calling Aeris for zip: {zipCode} and date: {fromDate}");
+            //Log.Information($"Calling Aeris for zip: {zipCode} and date: {fromDate}");
 
             /* 
-             * example
+                * example
             http://api.aerisapi.com/observations/summary/closest?p=94304&query=maxt:!NULL,maxdewpt:!NULL&from=12/03/2014&to=12/03/2014&fields=id,periods.summary.dateTimeISO,periods.summary.temp.maxF,periods.summary.temp.minF,periods.summary.temp.avgF,periods.summary.dewpt.avgF
             */
 
@@ -358,12 +362,10 @@ namespace WeatherServiceForm.Scheduled
             builder.Append(_aerisJobParams.AerisClientSecret);
 
             string url = builder.ToString();
-            Console.WriteLine("url: {0}", url);
 
             using (WebClient wc = new WebClient())
             {
                 var json = wc.DownloadString(url);
-                //Log.Information($"JSON: {json}");                                                                  
                 return JsonConvert.DeserializeObject<AerisResult>(json, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Include });
             }
         }

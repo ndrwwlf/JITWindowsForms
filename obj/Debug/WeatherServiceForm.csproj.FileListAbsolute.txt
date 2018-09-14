@@ -57,10 +57,10 @@ C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\bin\Debug\Accord.Math.xml
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\bin\Debug\Accord.Math.Core.xml
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\bin\Debug\Accord.Statistics.xml
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Debug\WeatherServiceForm.csprojAssemblyReference.cache
-C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Debug\WeatherForm.Form1.resources
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Debug\WeatherServiceApp.Properties.Resources.resources
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Debug\WeatherServiceForm.csproj.GenerateResource.cache
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Debug\WeatherServiceForm.csproj.CoreCompileInputs.cache
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Debug\WeatherServiceApp.exe.manifest
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Debug\WeatherServiceApp.application
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Debug\WeatherServiceForm.csproj.CopyComplete
+C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Debug\WeatherServiceForm.Form1.resources

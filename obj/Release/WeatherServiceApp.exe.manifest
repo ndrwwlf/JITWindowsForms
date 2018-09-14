@@ -187,14 +187,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="WeatherServiceApp.exe" size="166872">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="WeatherServiceApp.exe" size="164312">
       <assemblyIdentity name="WeatherServiceApp" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>/uiaCBbH3X/+QmCLFL8OYQkQ4a5XrGqk/dnOxRWKUD4=</dsig:DigestValue>
+        <dsig:DigestValue>GrIAmbjd14usUated+iz0aWolWlwvOCy9smMMIs0oyw=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>

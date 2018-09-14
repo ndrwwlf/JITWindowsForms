@@ -1,15 +1,13 @@
 ﻿using Dapper;
+using WeatherServiceForm.Dao;
+using WeatherServiceForm.Model;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
-using WeatherForm.Dto;
-using WeatherForm.Model;
-using WeatherServiceApp.Dao;
-using WeatherServiceForm;
 
-namespace WeatherForm.Repository
+namespace WeatherServiceForm.Repository
 {
     public class WeatherRepository : IWeatherRepository
     {
@@ -28,19 +26,40 @@ namespace WeatherForm.Repository
 
             using (IDbConnection db = new SqlConnection(_jitWebData3ConnectionString))
             {
-                allZips = db.Query<string>("select distinct b.Zip from Buildings as b " +
+                allZips = db.Query<string>(
+                    "select distinct b.Zip from Buildings as b " +
                     "join Accounts as a on b.BldID = a.BldID " +
-                    "join WthNormalParams as w on a.AccID = w.AccID").AsList();
+                    "join WthNormalParams as w on a.AccID = w.AccID"
+                    ).AsList();
             }
             return allZips;
+        }
+
+        public DateTime GetEarliestDateNeededForWeatherDataFetching(int MoID)
+        {
+            DateTime earliestDate = new DateTime(2015, 1, 1);
+
+            string sql = @"select top(1)r.DateStart from Readings r
+                        join WthNormalParams wnp
+                        on wnp.AccID = r.AccID and wnp.UtilID = r.UtilID and wnp.UnitID = r.UnitID
+                        where r.MoID >= @MoID
+                        and r.DateStart is not null
+                        order by r.DateStart";
+
+            using (IDbConnection db = new SqlConnection(_jitWebData3ConnectionString))
+            {
+                earliestDate = db.Query<DateTime>(sql, new { MoID }).First();
+            }
+
+            return earliestDate;
         }
 
         public bool InsertWeatherData(WeatherData weatherData)
         {
             string sql = @"
-        INSERT INTO [WeatherData] ([StationId], [ZipCode], [RDate], [HighTmp], [LowTmp], [AvgTmp], [DewPt]) 
-        VALUES (@StationId, @ZipCode, @RDate, @HighTmp, @LowTmp, @AvgTmp, @DewPT);
-        SELECT CAST(SCOPE_IDENTITY() as int)";
+            INSERT INTO [WeatherData] ([StationId], [ZipCode], [RDate], [HighTmp], [LowTmp], [AvgTmp], [DewPt]) 
+            VALUES (@StationId, @ZipCode, @RDate, @HighTmp, @LowTmp, @AvgTmp, @DewPT);
+            SELECT CAST(SCOPE_IDENTITY() as int)";
 
             using (IDbConnection db = new SqlConnection(_jitWeatherConnectionString))
             {
@@ -102,66 +121,63 @@ namespace WeatherForm.Repository
             }
         }
 
-        public DateTime GetCurrentOldestWeatherDataDate()
-        {
-            using (IDbConnection db = new SqlConnection(_jitWeatherConnectionString))
-            {
-                var date = db.Query<DateTime>("SELECT TOP(1) RDate FROM WeatherData ORDER BY RDate ASC").First();
-                return date;
-            }
-        }
-
-        public List<ReadingsQueryResult> GetReadings(string DateStart)
+        public List<ReadingsQueryResult> GetReadings(int MoID)
         {
             string DateEnd = GetMostRecentWeatherDataDate().AddDays(1).ToShortDateString();
             var data = new List<ReadingsQueryResult>();
 
             string Sql = @"select r.RdngID, b.Zip, r.DateStart, r.DateEnd, r.Days, r.Units, 
-                                  wnp.AccID, wnp.UtilID, wnp.UnitID, wnp.B1, wnp.B2, wnp.B3, wnp.B4, wnp.B5, wnp.R2
-                        from Readings r 
+                                  wnp.AccID, wnp.UtilID, wnp.UnitID, wnp.B1, wnp.B2, wnp.B3, wnp.B4, wnp.B5, wnp.R2 
+                            from Readings r 
                             join WthNormalParams wnp on wnp.AccID = r.AccID
                                                     and wnp.UtilID = r.UtilID
                                                     and wnp.UnitID = r.UnitID
-                        join Accounts a on a.AccID = r.AccID
-                        join Buildings b on b.BldID = a.BldID
-                        where not exists 
-                            (select weu.RdngID from WthExpUsage weu
-                                where weu.RdngID = r.RdngID)
-                        and r.DateStart >= @DateStart
-                        and r.DateEnd <= @DateEnd
-                        order by DateStart asc";
+                            join Accounts a on a.AccID = r.AccID
+                            join Buildings b on b.BldID = a.BldID
+                            where not exists 
+                                (select weu.RdngID from WthExpUsage weu
+                                    where weu.RdngID = r.RdngID)
+                            and r.MoID >= @MoID
+                            and r.DateEnd <= @DateEnd
+                            and wnp.R2 is not null 
+                            order by DateStart asc";
 
             using (IDbConnection db = new SqlConnection(_jitWebData3ConnectionString))
             {
-                return db.Query<ReadingsQueryResult>(Sql, new { DateStart, DateEnd }).AsList();
+                return db.Query<ReadingsQueryResult>(Sql, new { MoID, DateEnd }).AsList();
             }
         }
 
-        public List<ReadingsQueryResult> GetReadingsForExpUsageUpdate(string DateStart, WthNormalParams normalParams)
+        public List<ReadingsQueryResult> GetReadingsForExpUsageUpdate(int MoID, WthNormalParams normalParams)
         {
             string DateEnd = GetMostRecentWeatherDataDate().AddDays(1).ToShortDateString();
             var data = new List<ReadingsQueryResult>();
 
-            string Sql = @"select r.RdngID, b.Zip, r.DateStart, r.DateEnd, r.Days, r.Units, 
+            string Sql = @"select r.RdngID, b.Zip, r.DateStart, r.DateEnd, r.Days, r.Units,   
                                   wnp.AccID, wnp.UtilID, wnp.UnitID, wnp.B1, wnp.B2, wnp.B3, wnp.B4, wnp.B5
-                        from Readings r 
+                            from Readings r 
                             join WthNormalParams wnp on wnp.AccID = r.AccID
                                                     and wnp.UtilID = r.UtilID
                                                     and wnp.UnitID = r.UnitID
-                        join Accounts a on a.AccID = r.AccID
-                        join Buildings b on b.BldID = a.BldID
-                        where 
-                        wnp.AccID = @AccID and
-                        wnp.UtilID = @UtilID and
-                        wnp.UnitID = @UnitID and
-                        r.DateStart >= @DateStart and
-                        r.DateEnd <= @DateEnd
-                        order by DateStart asc";
+                            join Accounts a on a.AccID = r.AccID
+                            join Buildings b on b.BldID = a.BldID
+                            where 
+                            wnp.AccID = @AccID and
+                            wnp.UtilID = @UtilID and
+                            wnp.UnitID = @UnitID and
+                            r.MoID >= @MoID and
+                            r.DateEnd <= @DateEnd
+                            order by DateStart asc";
 
             using (IDbConnection db = new SqlConnection(_jitWebData3ConnectionString))
             {
-                return db.Query<ReadingsQueryResult>(Sql, new {
-                    normalParams.AccID, normalParams.UtilID, normalParams.UnitID, DateStart, DateEnd
+                return db.Query<ReadingsQueryResult>(Sql, new
+                {
+                    normalParams.AccID,
+                    normalParams.UtilID,
+                    normalParams.UnitID,
+                    MoID,
+                    DateEnd
                 }).AsList();
             }
         }
@@ -171,14 +187,14 @@ namespace WeatherForm.Repository
             string DateEnd = GetMostRecentWeatherDataDate().AddDays(1).ToShortDateString();
 
             string sql = @"select count(r.RdngID) 
-                        from Readings r 
-                        join WthNormalParams wnp on wnp.AccID = r.AccID
-                                                and wnp.UtilID = r.UtilID
-                                                and wnp.UnitID = r.UnitID
-                        join Accounts a on a.AccID = r.AccID
-                        join Buildings b on b.BldID = a.BldID
-                        where  r.DateStart >= @DateStart
-                            and r.DateEnd <= @DateEnd";
+                           from Readings r 
+                           join WthNormalParams wnp on wnp.AccID = r.AccID
+                                                    and wnp.UtilID = r.UtilID
+                                                    and wnp.UnitID = r.UnitID
+                           join Accounts a on a.AccID = r.AccID
+                           join Buildings b on b.BldID = a.BldID
+                           where  r.DateStart >= @DateStart
+                              and r.DateEnd <= @DateEnd";
 
             using (IDbConnection db = new SqlConnection(_jitWebData3ConnectionString))
             {
@@ -200,7 +216,7 @@ namespace WeatherForm.Repository
             var data = new List<WeatherData>();
 
             string Sql = @"SELECT ID, (RTRIM(StationId)) as StationId, (RTRIM(ZipCode)) as ZipCode, RDate, HighTmp, LowTmp, AvgTmp, DewPt FROM WeatherData  
-                            WHERE ZipCode = @ZipCode  AND RDATE >= @DateStart AND RDATE < @DateEnd ORDER BY ID";
+                             WHERE ZipCode = @ZipCode  AND RDATE >= @DateStart AND RDATE < @DateEnd ORDER BY ID";
 
             using (IDbConnection db = new SqlConnection(_jitWeatherConnectionString))
             {
@@ -223,9 +239,9 @@ namespace WeatherForm.Repository
         public bool InsertWthExpUsage(int ReadingId, decimal ExpUsage)
         {
             string sql = @"
-        INSERT INTO [WthExpUsage] ([RdngID], [ExpUsage]) 
-        VALUES (@ReadingID, @ExpUsage);
-        SELECT CAST(SCOPE_IDENTITY() as int)";
+            INSERT INTO [WthExpUsage] ([RdngID], [ExpUsage]) 
+            VALUES (@ReadingID, @ExpUsage);
+            SELECT CAST(SCOPE_IDENTITY() as int)";
 
             using (IDbConnection db = new SqlConnection(_jitWebData3ConnectionString))
             {
@@ -277,16 +293,16 @@ namespace WeatherForm.Repository
         {
             int rowsAffected = 0;
             string sql = @"
-            INSERT INTO [WthNormalParams] (
-            [AccID], [UtilID], [UnitID], [WstID], [ZipW], 
-            [B1], [B2], [B3], [B4], [B5], [R2], 
-            [EndDate], [EMoID], [MoCt]
-            ) 
-            VALUES (
-            @AccID, @UtilID, @UnitID, @WstID, @ZipW,
-            @B1, @B2, @B3, @B4, @B5, @R2,
-            @EndDate, @EMoID, @MoCt
-            )";
+                INSERT INTO [WthNormalParams] (
+                [AccID], [UtilID], [UnitID], [WstID], [ZipW], 
+                [B1], [B2], [B3], [B4], [B5], [R2], 
+                [EndDate], [EMoID], [MoCt]
+                ) 
+                VALUES (
+                @AccID, @UtilID, @UnitID, @WstID, @ZipW,
+                @B1, @B2, @B3, @B4, @B5, @R2,
+                @EndDate, @EMoID, @MoCt
+                )";
 
             using (IDbConnection db = new SqlConnection(_jitWebData3ConnectionString))
             {
@@ -316,18 +332,18 @@ namespace WeatherForm.Repository
         {
             int rowsAffected = 0;
             string sql = @"update WthNormalParams set 
-                        B1 = @B1, 
-                        B2 = @B2, 
-                        B3 = @B3, 
-                        B4 = @B4, 
-                        B5 = @B5, 
-                        R2 = @R2, 
-                        EndDate = @EndDate, 
-                        EMoID = @EMoID
-                    where 
-                        AccID = @AccID and 
-                        UtilID = @UtilID and 
-                        UnitID = @UnitID";
+                            B1 = @B1, 
+                            B2 = @B2, 
+                            B3 = @B3, 
+                            B4 = @B4, 
+                            B5 = @B5, 
+                            R2 = @R2, 
+                            EndDate = @EndDate, 
+                            EMoID = @EMoID
+                        where 
+                            AccID = @AccID and 
+                            UtilID = @UtilID and 
+                            UnitID = @UnitID";
 
             using (IDbConnection db = new SqlConnection(_jitWebData3ConnectionString))
             {
@@ -348,6 +364,27 @@ namespace WeatherForm.Repository
             }
 
             return (rowsAffected == 1);
+        }
+
+        public void ClearWthNormalParams()
+        {
+            var oldPs = new List<WthNormalParams>();
+
+            using (IDbConnection db = new SqlConnection(_jitWebData3ConnectionString))
+            {
+                oldPs = db.Query<WthNormalParams>("Select * from WthNormalParams").AsList();
+            }
+
+            foreach (WthNormalParams p in oldPs)
+            {
+                string sql = "Update WthNormalParams Set B1 = null, B2 = null, B3 = null, B4 = null, B5 = null, R2 = null " +
+                    "where AccID = @AccID and UtilID = @UtilID and UnitID = @UnitID";
+
+                using (IDbConnection db = new SqlConnection(_jitWebData3ConnectionString))
+                {
+                    db.Execute(sql, new { p.AccID, p.UtilID, p.UnitID });
+                }
+            }
         }
     }
 }

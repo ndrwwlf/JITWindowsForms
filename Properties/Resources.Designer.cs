@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace WeatherServiceApp.Properties {
+namespace WeatherServiceForm.Properties {
     using System;
     
     

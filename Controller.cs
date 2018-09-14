@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using WeatherForm.Dto;
-using WeatherForm.Model;
-using WeatherForm.Repository;
+using WeatherServiceForm.Dao;
+using WeatherServiceForm.Model;
+using WeatherServiceForm.Repository;
 using WeatherServiceForm.Model;
 
 namespace WeatherServiceForm

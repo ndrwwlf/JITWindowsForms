@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace WeatherForm.Dto
+namespace WeatherServiceForm.Dao
 {
     public class ReadingsQueryResult
     {
