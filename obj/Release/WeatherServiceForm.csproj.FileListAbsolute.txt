@@ -62,5 +62,5 @@ C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Release\WeatherServiceAp
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Release\WeatherServiceForm.csproj.CopyComplete
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Release\WeatherServiceApp.exe
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Release\WeatherServiceApp.pdb
-C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Release\WeatherServiceForm.csprojAssemblyReference.cache
 C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Release\WeatherServiceForm.Form1.resources
+C:\Users\andy\ProjectsMoved\WeatherForm\WeatherForm\obj\Release\WeatherServiceForm.csprojAssemblyReference.cache

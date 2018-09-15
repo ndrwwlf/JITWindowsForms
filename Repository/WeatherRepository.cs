@@ -182,7 +182,7 @@ namespace WeatherServiceForm.Repository
             }
         }
 
-        public int GetExpectedWthExpUsageRowCount(string DateStart)
+        public int GetExpectedWthExpUsageRowCount(int MoID)
         {
             string DateEnd = GetMostRecentWeatherDataDate().AddDays(1).ToShortDateString();
 
@@ -193,12 +193,13 @@ namespace WeatherServiceForm.Repository
                                                     and wnp.UnitID = r.UnitID
                            join Accounts a on a.AccID = r.AccID
                            join Buildings b on b.BldID = a.BldID
-                           where  r.DateStart >= @DateStart
-                              and r.DateEnd <= @DateEnd";
+                           where  r.MoID >= @MoID
+                              and r.DateEnd <= @DateEnd
+                              and wnp.R2 is not null";
 
             using (IDbConnection db = new SqlConnection(_jitWebData3ConnectionString))
             {
-                return db.ExecuteScalar<int>(sql, new { DateStart, DateEnd });
+                return db.ExecuteScalar<int>(sql, new { MoID, DateEnd });
             }
         }
 

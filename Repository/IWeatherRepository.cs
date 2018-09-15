@@ -41,7 +41,7 @@ namespace WeatherServiceForm.Repository
         DateTime GetMostRecentWeatherDataDate();
         List<ReadingsQueryResult> GetReadings(int MoID);
         List<ReadingsQueryResult> GetReadingsForExpUsageUpdate(int MoID, WthNormalParams normalParams);
-        int GetExpectedWthExpUsageRowCount(string DateStart);
+        int GetExpectedWthExpUsageRowCount(int MoID);
         int GetActualWthExpUsageRowCount();
         List<WeatherData> GetWeatherDataByZipStartAndEndDate(string ZipCode, DateTime DateStart, DateTime DateEnd);
         bool InsertWthExpUsage(int readingId, decimal value);
